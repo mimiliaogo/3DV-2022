@@ -1,8 +1,10 @@
 # input data
-base_dir: /home/odie/3DV-2022
-data_dir: ${base_dir}/data/chair_img_pc_voxel_mesh
-dtype: "point" # "point" "voxel"
+base_dir: /home/mimiliaogo/3DV-2022
+data_dir: ${base_dir}/data/chair
+dtype: "voxel" # "point" "voxel"
 n_points: 2048
+# number of voxel grids
+n_voxels: 33
 
 # vision model
 arch: resnet18
@@ -23,6 +25,6 @@ save_freq: 100
 load_checkpoint: False
 
 # eval
-vis_freq: 1000
+vis_freq: 100
 load_eval_checkpoint: True
 

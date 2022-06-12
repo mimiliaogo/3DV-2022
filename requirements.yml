@@ -1,4 +1,4 @@
-name: py3d
+name: py3d-v2
 channels:
   - pytorch3d
   - pytorch

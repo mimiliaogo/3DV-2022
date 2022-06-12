@@ -7,6 +7,7 @@ from src.losses import ChamferDistanceLoss
 
 import hydra
 from omegaconf import DictConfig
+import matplotlib.pyplot as plt
 
 cd_loss = ChamferDistanceLoss()
 
@@ -46,6 +47,10 @@ def train_model(cfg: DictConfig):
     optimizer = torch.optim.Adam(model.parameters(), lr = cfg.lr)  # to use with ViTs
     start_iter = 0
     start_time = time.time()
+    # plot loss
+    running_loss = 0.0
+    avg_loss = []
+    loss_freq = 20
 
     if cfg.load_checkpoint:
         checkpoint = torch.load(f'{cfg.base_dir}/checkpoint_{cfg.dtype}.pth')
@@ -80,6 +85,7 @@ def train_model(cfg: DictConfig):
         iter_time = time.time() - iter_start_time
 
         loss_vis = loss.cpu().item()
+        running_loss += loss_vis
 
         if (step % cfg.save_freq) == 0:
             torch.save({
@@ -87,9 +93,17 @@ def train_model(cfg: DictConfig):
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict()
                 }, f'{cfg.base_dir}/checkpoint_{cfg.dtype}.pth')
+        if step != 0 and (step % loss_freq) == 0:
+            avg_loss.append(running_loss / loss_freq)
+            running_loss = 0.0
 
         print("[%4d/%4d]; ttime: %.0f (%.2f, %.2f); loss: %.5f" % (step, cfg.max_iter, total_time, read_time, iter_time, loss_vis))
 
+    # plot the loss curve
+    plt.ylabel('loss')
+    plt.xlabel('step')
+    plt.plot(avg_loss)
+    plt.savefig(f'{cfg.base_dir}/loss_curve_{cfg.dtype}.png')
     print('Done!')
 
 

@@ -1,5 +1,6 @@
 import time
 import torch
+import torch.nn as nn
 from src.dataset import ShapeNetDB
 from src.model import SingleViewto3D
 import src.losses as losses
@@ -9,8 +10,13 @@ import numpy as np
 import hydra
 from omegaconf import DictConfig
 
+import matplotlib.pyplot as plt
+# for voxel visualize
+from mpl_toolkits.mplot3d import Axes3D
 
 cd_loss = ChamferDistanceLoss()
+# for voxel prediction
+sidmoid = nn.Sigmoid()
 
 def calculate_loss(predictions, ground_truth, cfg):
     if cfg.dtype == 'voxel':
@@ -26,7 +32,22 @@ def calculate_loss(predictions, ground_truth, cfg):
 
         # loss = cfg.w_chamfer * loss_reg + cfg.w_smooth * loss_smooth        
     return loss
+    
+def visualize(rend, step, cfg):
+    print(rend.shape)
+    fig = plt.figure()
+    if cfg.dtype == 'point':
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(rend[...,0], rend[...,1], rend[...,2], c='r', marker='.')
+    if cfg.dtype == 'voxel':
+        rend = rend.squeeze().__ge__(0.5)
+        ax = fig.gca(projection=Axes3D.name)
+        ax.set_aspect('auto')
+        ax.voxels(rend, edgecolor="k")
 
+    
+    plt.savefig(f'{cfg.base_dir}/vis/{step}_{cfg.dtype}_gt.png')
+    
 @hydra.main(config_path="configs/", config_name="config.yml")
 def evaluate_model(cfg: DictConfig):
     shapenetdb = ShapeNetDB(cfg.data_dir, cfg.dtype)
@@ -71,10 +92,10 @@ def evaluate_model(cfg: DictConfig):
         loss = calculate_loss(prediction_3d, ground_truth_3d, cfg).cpu().item()
 
         # TODO:
-        # if (step % cfg.vis_freq) == 0:
-        #     # visualization block
-        #     #  rend = 
-        #     plt.imsave(f'vis/{step}_{args.dtype}.png', rend)
+        if (step % cfg.vis_freq) == 0:
+            # visualization block
+            rend = ground_truth_3d.cpu().detach().numpy()[0]
+            visualize(rend, step, cfg)
 
         total_time = time.time() - start_time
         iter_time = time.time() - iter_start_time
