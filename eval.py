@@ -46,7 +46,7 @@ def visualize(rend, step, cfg):
         ax.voxels(rend, edgecolor="k")
 
     
-    plt.savefig(f'{cfg.base_dir}/vis/{step}_{cfg.dtype}_gt.png')
+    plt.savefig(f'{cfg.base_dir}/vis_vox/{step}_{cfg.dtype}.png')
     
 @hydra.main(config_path="configs/", config_name="config.yml")
 def evaluate_model(cfg: DictConfig):
@@ -87,14 +87,17 @@ def evaluate_model(cfg: DictConfig):
         read_time = time.time() - read_start_time
 
         prediction_3d = model(images_gt, cfg)
-        torch.save(prediction_3d.detach().cpu(), f'{cfg.base_dir}/pre_point_cloud.pt')
+        
+        if cfg.dtype == 'point':
+            torch.save(prediction_3d.detach().cpu(), f'{cfg.base_dir}/pre_point_cloud.pt')
 
         loss = calculate_loss(prediction_3d, ground_truth_3d, cfg).cpu().item()
+        
 
         # TODO:
         if (step % cfg.vis_freq) == 0:
             # visualization block
-            rend = ground_truth_3d.cpu().detach().numpy()[0]
+            rend = prediction_3d.cpu().detach().numpy()[0]
             visualize(rend, step, cfg)
 
         total_time = time.time() - start_time

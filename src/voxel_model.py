@@ -3,9 +3,8 @@ import torchvision.models
 
 
 class VoxelEncoder(torch.nn.Module):
-    def __init__(self, cfg):
+    def __init__(self):
         super(VoxelEncoder, self).__init__()
-        self.cfg = cfg
 
         # Layer Definition
         vgg16_bn = torchvision.models.vgg16_bn(pretrained=True)
@@ -32,6 +31,9 @@ class VoxelEncoder(torch.nn.Module):
             param.requires_grad = False
 
     def forward(self, rendering_images):
+        # expand
+        rendering_images = torch.unsqueeze(rendering_images, 1)
+        # print('render', rendering_images.shape)
         # print(rendering_images.size())  # torch.Size([batch_size, n_views, img_c, img_h, img_w])
         rendering_images = rendering_images.permute(1, 0, 2, 3, 4).contiguous()
         rendering_images = torch.split(rendering_images, 1, dim=0)
@@ -53,10 +55,9 @@ class VoxelEncoder(torch.nn.Module):
         return image_features
 
 
-class Decoder(torch.nn.Module):
-    def __init__(self, cfg):
-        super(Decoder, self).__init__()
-        self.cfg = cfg
+class VoxelDecoder(torch.nn.Module):
+    def __init__(self):
+        super(VoxelDecoder, self).__init__()
 
         # Layer Definition
         self.layer1 = torch.nn.Sequential(
@@ -85,6 +86,7 @@ class Decoder(torch.nn.Module):
         )
 
     def forward(self, image_features):
+        # print(image_features.shape)
         image_features = image_features.permute(1, 0, 2, 3, 4).contiguous()
         image_features = torch.split(image_features, 1, dim=0)
         gen_volumes = []
@@ -112,6 +114,9 @@ class Decoder(torch.nn.Module):
 
         gen_volumes = torch.stack(gen_volumes).permute(1, 0, 2, 3, 4).contiguous()
         raw_features = torch.stack(raw_features).permute(1, 0, 2, 3, 4, 5).contiguous()
-        # print(gen_volumes.size())      # torch.Size([batch_size, n_views, 32, 32, 32])
+        print(gen_volumes.size())      # torch.Size([batch_size, n_views, 32, 32, 32])
         # print(raw_features.size())     # torch.Size([batch_size, n_views, 9, 32, 32, 32])
-        return raw_features, gen_volumes
+        # mimi add 
+        gen_volumes = gen_volumes.squeeze()
+        # return raw_features, gen_volumes
+        return gen_volumes

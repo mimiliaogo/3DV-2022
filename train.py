@@ -74,7 +74,6 @@ def train_model(cfg: DictConfig):
         read_time = time.time() - read_start_time
 
         prediction_3d = model(images_gt, cfg)
-
         loss = calculate_loss(prediction_3d, ground_truth_3d, cfg)
 
         optimizer.zero_grad()

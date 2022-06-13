@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 # from pytorch3d.utils import ico_sphere
 # import pytorch3d
+from src.voxel_model import VoxelEncoder, VoxelDecoder
 
 class SingleViewto3D(nn.Module):
     def __init__(self, cfg):
@@ -19,7 +20,8 @@ class SingleViewto3D(nn.Module):
         # define decoder
         if cfg.dtype == "voxel":
             # TODO:
-            self.decoder = VoxelDecoder(cfg.n_voxels, 512)
+            self.encoder = VoxelEncoder()
+            self.decoder = VoxelDecoder()
         elif cfg.dtype == "point":
             self.n_point = cfg.n_points
             # TODO:
@@ -40,16 +42,18 @@ class SingleViewto3D(nn.Module):
         B = images.shape[0]
 
         images_normalize = self.normalize(images.permute(0,3,1,2))
-        encoded_feat = self.encoder(images_normalize).squeeze(-1).squeeze(-1)
+        # encoded_feat = self.encoder(images_normalize).squeeze(-1).squeeze(-1)
 
         # call decoder
         if cfg.dtype == "voxel":
             # TODO:
+            encoded_feat = self.encoder(images_normalize)
             voxels_pred = self.decoder(encoded_feat)            
             return voxels_pred
 
         elif cfg.dtype == "point":
             # TODO:
+            encoded_feat = self.encoder(images_normalize).squeeze(-1).squeeze(-1)
             pointclouds_pred = self.decoder(encoded_feat)
             return pointclouds_pred
 
@@ -84,7 +88,7 @@ class PointDecoder(nn.Module):
         return x
 
 
-class VoxelDecoder(nn.Module):
+class VoxelDecoder2(nn.Module):
     def __init__(self, num_voxels, latent_size):
         super(VoxelDecoder, self).__init__()
         self.num_voxels = num_voxels

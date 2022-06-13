@@ -13,6 +13,8 @@ from pytorch3d.structures import Meshes
 from pytorch3d.io import load_obj
 from pytorch3d.renderer import TexturesVertex
 
+import cv2
+
 class ShapeNetDB(Dataset):
     def __init__(self, data_dir, data_type, img_transform=False):
         super(ShapeNetDB).__init__()
@@ -49,7 +51,7 @@ class ShapeNetDB(Dataset):
             voxel: (B, 33, 33, 33)
             object_id: (B,)
             """
-            img, img_id = self.load_img(idx)
+            img, img_id = self.load_img_transform(idx)
             voxel, object_id = self.load_voxel(idx)
 
             assert img_id == object_id
@@ -93,7 +95,30 @@ class ShapeNetDB(Dataset):
         object_id = self.db[idx].split('/')[self.id_index]
 
         return img, object_id
-    
+    def load_img_transform(self, idx):
+        path = os.path.join(self.db[idx], 'view.png')
+        # img = read_image(path) / 255.0
+        # img = img.permute(1,2,0)
+        image = Image.open(path).convert('RGB')
+        image = image.resize((224, 224), Image.BICUBIC)
+        image = np.asarray(image, np.float32)
+        image = image / 255.0
+        # print(image.shape)
+        image = torch.from_numpy(image)
+        # img = torch.from_numpy(np.array(raw_img) / 255.0)[..., :3]
+        # img = img.to(dtype=torch.float32)
+
+      
+        # trans = transforms.Compose([
+        #                             transforms.Resize(224),
+        #                             transforms.ToTensor()
+        #                             ])
+        # img = trans(img)
+
+        object_id = self.db[idx].split('/')[self.id_index]
+
+        return image, object_id
+        
     # def load_mesh(self, idx):
     #     path = os.path.join(self.db[idx], 'model.obj')
     #     verts, faces, _ = load_obj(path, load_textures=False)
@@ -140,7 +165,8 @@ class ShapeNetDB(Dataset):
     def load_voxel(self, idx):
         path = os.path.join(self.db[idx], 'voxel.npy')
         voxel = np.load(path)
-
+        # mimi to resize to 32
+        voxel = voxel[1:, 1:, 1:]
         object_id = self.db[idx].split('/')[self.id_index]
 
         return torch.from_numpy(voxel), object_id
