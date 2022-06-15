@@ -1,11 +1,16 @@
 import torch
 import torch.nn as nn
-
+from pytorch3d.loss import (
+    chamfer_distance, 
+    mesh_edge_loss, 
+    mesh_laplacian_smoothing, 
+    mesh_normal_consistency,
+)
 # define losses
 def voxel_loss(voxel_src,voxel_tgt):
     # voxel_src: [B, 33, 33, 33], voxel_tgt: [B, 33, 33, 33]
 	# implement some loss for binary voxel grids
-    # sidmoid = nn.Sigmoid() => in model
+    # sidmoid = nn.Sigmoid() # => in model
     bce_loss = nn.BCELoss()
     prob_loss = bce_loss(voxel_src, voxel_tgt.float())
     return prob_loss
@@ -17,10 +22,22 @@ def chamfer_loss(point_cloud_src,point_cloud_tgt):
 
     return loss_chamfer
 
-# def smoothness_loss(mesh_src):
-# 	# loss = 
-# 	# implement laplacian smoothening loss
-# 	return loss_laplacian
+# enforce smoothness by adding shape regularizers
+def smoothness_loss(mesh_src, cfg):
+	# implement laplacian smoothening loss
+    
+    # the edge length of the predicted mesh
+    loss_edge = mesh_edge_loss(mesh_src)
+    
+    # mesh normal consistency
+    loss_normal = mesh_normal_consistency(mesh_src)
+    
+    # mesh laplacian smoothing
+    loss_laplacian = mesh_laplacian_smoothing(mesh_src, method="uniform")
+
+    loss = loss_edge * cfg.w_edge + loss_normal * cfg.w_normal + loss_laplacian * cfg.w_laplacian
+    
+    return loss
 
 class ChamferDistanceLoss(torch.nn.Module):
     def __init__(self):

@@ -13,7 +13,7 @@ from pytorch3d.structures import Meshes
 from pytorch3d.io import load_obj
 from pytorch3d.renderer import TexturesVertex
 
-import cv2
+
 
 class ShapeNetDB(Dataset):
     def __init__(self, data_dir, data_type, img_transform=False):
@@ -51,20 +51,30 @@ class ShapeNetDB(Dataset):
             voxel: (B, 33, 33, 33)
             object_id: (B,)
             """
-            img, img_id = self.load_img_transform(idx)
+            img, img_id = self.load_img_transform(idx) # for pix2vox
+            # img, img_id = self.load_img(idx)
             voxel, object_id = self.load_voxel(idx)
 
             assert img_id == object_id
 
             return img, voxel, object_id
 
-        # elif self.data_type == 'mesh':
-        #     img, img_id = self.load_img(idx)
-        #     mesh, object_id = self.load_mesh(idx)
+        elif self.data_type == 'mesh':
+            img, img_id = self.load_img(idx)
+            # mesh, object_id = self.load_mesh(idx)
+            verts, faces, textures, object_id = self.load_mesh(idx)
 
-        #     assert img_id == object_id
+            assert img_id == object_id
+            mesh_dict = {}
+            mesh_dict["images"] = img
+            mesh_dict["object_id"] = object_id
 
-        #     return img, mesh, object_id
+            mesh_dict["verts"] = verts
+            mesh_dict["faces_idx"] = faces
+            mesh_dict["textures"] = textures
+
+            # cannot return mesh object
+            return mesh_dict
 
     def load_db(self):
         # print(os.path.join(self.data_dir, '*'))
@@ -119,20 +129,20 @@ class ShapeNetDB(Dataset):
 
         return image, object_id
         
-    # def load_mesh(self, idx):
-    #     path = os.path.join(self.db[idx], 'model.obj')
-    #     verts, faces, _ = load_obj(path, load_textures=False)
-    #     faces_idx = faces.verts_idx
+    def load_mesh(self, idx):
+        path = os.path.join(self.db[idx], 'model.obj')
+        verts, faces, _ = load_obj(path, load_textures=False)
+        faces_idx = faces.verts_idx
 
-    #     # normalize
-    #     center = verts.mean(0)
-    #     verts = verts - center
-    #     scale = max(verts.abs().max(0)[0])
-    #     verts = verts / scale
+        # normalize
+        center = verts.mean(0)
+        verts = verts - center
+        scale = max(verts.abs().max(0)[0])
+        verts = verts / scale
 
         # make white texturre
-        # verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
-        # textures = TexturesVertex(verts_features=verts_rgb)
+        verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
+        textures = TexturesVertex(verts_features=verts_rgb)
 
         # mesh = Meshes(
         #     verts=[verts],
@@ -140,9 +150,10 @@ class ShapeNetDB(Dataset):
         #     textures=textures
         # )
 
-        # object_id = self.db[idx].split('/')[self.id_index]
-
+        object_id = self.db[idx].split('/')[self.id_index]
+        
         # return mesh, object_id
+        return verts, faces_idx, textures, object_id
 
     def load_point(self, idx):
         path = os.path.join(self.db[idx], 'point_cloud.npy')
@@ -165,7 +176,7 @@ class ShapeNetDB(Dataset):
     def load_voxel(self, idx):
         path = os.path.join(self.db[idx], 'voxel.npy')
         voxel = np.load(path)
-        # mimi to resize to 32
+        # pix2vox: voxel resize to 32*32
         voxel = voxel[1:, 1:, 1:]
         object_id = self.db[idx].split('/')[self.id_index]
 

@@ -8,6 +8,13 @@ from src.losses import ChamferDistanceLoss
 import hydra
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
+# mesh
+from pytorch3d.ops import sample_points_from_meshes
+
+from pytorch3d.structures import Meshes
+
+# for mesh return 
+from  pytorch3d.datasets.r2n2.utils import collate_batched_R2N2
 
 cd_loss = ChamferDistanceLoss()
 
@@ -16,14 +23,14 @@ def calculate_loss(predictions, ground_truth, cfg):
         loss = losses.voxel_loss(predictions,ground_truth)
     elif cfg.dtype == 'point':
         loss = cd_loss(predictions, ground_truth)
-    # elif cfg.dtype == 'mesh':
-    #     sample_trg = sample_points_from_meshes(ground_truth, cfg.n_points)
-    #     sample_pred = sample_points_from_meshes(predictions, cfg.n_points)
+    elif cfg.dtype == 'mesh':
+        sample_trg = sample_points_from_meshes(ground_truth, cfg.n_points)
+        sample_pred = sample_points_from_meshes(predictions, cfg.n_points)
 
-    #     loss_reg = losses.chamfer_loss(sample_pred, sample_trg)
-    #     loss_smooth = losses.smoothness_loss(predictions)
+        loss_reg = losses.chamfer_loss(sample_pred, sample_trg)
+        loss_smooth = losses.smoothness_loss(predictions, cfg)
 
-        # loss = cfg.w_chamfer * loss_reg + cfg.w_smooth * loss_smooth        
+        loss = cfg.w_chamfer * loss_reg + loss_smooth        
     return loss
 
 @hydra.main(config_path="configs/", config_name="config.yml")
@@ -31,12 +38,21 @@ def train_model(cfg: DictConfig):
     print(cfg.data_dir)
     shapenetdb = ShapeNetDB(cfg.data_dir, cfg.dtype)
 
-    loader = torch.utils.data.DataLoader(
-        shapenetdb,
-        batch_size=cfg.batch_size,
-        num_workers=cfg.num_workers,
-        pin_memory=True,
-        drop_last=True)
+    if cfg.dtype == "mesh":
+        loader = torch.utils.data.DataLoader(
+            shapenetdb,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.num_workers,
+            collate_fn=collate_batched_R2N2,
+            pin_memory=True,
+            drop_last=True)
+    else:
+        loader = torch.utils.data.DataLoader(
+            shapenetdb,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.num_workers,
+            pin_memory=True,
+            drop_last=True)
     train_loader = iter(loader)
 
     model =  SingleViewto3D(cfg)
@@ -68,9 +84,19 @@ def train_model(cfg: DictConfig):
 
         read_start_time = time.time()
 
-        images_gt, ground_truth_3d, _ = next(train_loader)
-        images_gt, ground_truth_3d = images_gt.cuda(), ground_truth_3d.cuda()
+        
+        if cfg.dtype == 'mesh':
+            mesh_dict = next(train_loader)
+            ground_truth_3d = Meshes(
+                verts=mesh_dict["verts"],
+                faces=mesh_dict["faces_idx"],
+                # textures=mesh_dict["textures"]
+            )
+            images_gt = mesh_dict["images"]
+        else:
+            images_gt, ground_truth_3d, _ = next(train_loader)
 
+        images_gt, ground_truth_3d = images_gt.cuda(), ground_truth_3d.cuda()
         read_time = time.time() - read_start_time
 
         prediction_3d = model(images_gt, cfg)
